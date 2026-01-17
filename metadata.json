@@ -1,0 +1,7 @@
+{
+  "name": "FinIntel AI Hub",
+  "description": "A high-efficiency investment intelligence system for noise-reduced financial insights, cross-sector correlations, and historical event tracking.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
