@@ -1,119 +1,132 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Layout from './components/Layout';
 import PortfolioSummary from './components/PortfolioSummary';
+import MacroIntelligence from './components/MacroIntelligence';
+import IndustryIntelligence from './components/IndustryIntelligence';
 import NewsFeed from './components/NewsFeed';
 import Timeline from './components/Timeline';
 import CorrelationGraph from './components/CorrelationGraph';
-import { ViewType, Stock, NewsItem, TimelineEvent, CorrelationNode, CorrelationLink } from './types';
+import SocialSentiment from './components/SocialSentiment';
+import { ViewType, Stock, NewsItem, TimelineEvent, CorrelationNode, CorrelationLink, SocialSignal, SocialComment, ConceptIntelligence } from './types';
 import { geminiService } from './services/gemini';
 
-const MOCK_STOCKS: Stock[] = [
-  { symbol: 'NVDA', name: 'NVIDIA Corporation', price: 924.79, change: 12.45, changePercent: 1.36, sector: 'Technology' },
-  { symbol: 'TSLA', name: 'Tesla, Inc.', price: 175.22, change: -4.30, changePercent: -2.39, sector: 'Automotive' },
-  { symbol: 'AAPL', name: 'Apple Inc.', price: 183.63, change: 0.82, changePercent: 0.45, sector: 'Technology' },
-  { symbol: 'MSFT', name: 'Microsoft Corporation', price: 415.50, change: 3.10, changePercent: 0.75, sector: 'Technology' },
-  { symbol: 'BABA', name: 'Alibaba Group', price: 73.40, change: -1.20, changePercent: -1.61, sector: 'Consumer' },
+const INITIAL_STOCKS: Stock[] = [
+  { symbol: 'NVDA', name: 'NVIDIA', price: 924.79, change: 12.45, changePercent: 1.36, sector: 'Technology', weight: 40 },
+  { symbol: 'TSLA', name: 'Tesla', price: 175.22, change: -4.30, changePercent: -2.39, sector: 'Automotive', weight: 15 },
+  { symbol: 'AAPL', name: 'Apple', price: 183.63, change: 0.82, changePercent: 0.45, sector: 'Technology', weight: 20 },
+  { symbol: 'MSFT', name: 'Microsoft', price: 415.50, change: 3.10, changePercent: 0.75, sector: 'Technology', weight: 25 },
 ];
 
 const MOCK_NEWS: NewsItem[] = [
   {
-    id: '1',
-    title: 'NVIDIA Announces New Blackwell GPU Architecture',
-    summary: 'The Blackwell B200 GPU features 208 billion transistors and offers 20 petaflops of AI performance. Analysts expect significant uplift in data center revenue.',
-    source: 'TechAnalytics',
-    timestamp: '2 hours ago',
-    category: 'Micro',
-    relatedStocks: ['NVDA', 'TSMC', 'ASML'],
-    sentiment: 'positive',
-    impactScore: 92
-  },
-  {
-    id: '2',
-    title: 'Federal Reserve Signals Interest Rate Plateau',
-    summary: 'FOMC meeting minutes suggest inflation is cooling, leading to potential rate cuts in late 2024. Markets react positively to the stability.',
-    source: 'MacroBrief',
-    timestamp: '5 hours ago',
+    id: 'm1',
+    title: 'US Department of Commerce to Announce New AI Export Framework',
+    summary: 'The upcoming directive is expected to redefine compute thresholds for cross-border AI acceleration deployment, impacting all major chip designers and cloud providers.',
+    source: 'PolicyWatch',
+    timestamp: '1 hour ago',
     category: 'Macro',
-    relatedStocks: ['AAPL', 'MSFT', 'TSLA'],
-    sentiment: 'neutral',
-    impactScore: 78
-  },
-  {
-    id: '3',
-    title: 'EV Demand Slowdown Hits European Markets',
-    summary: 'Registration data for new electric vehicles in Germany and France show a 15% YoY decline as subsidies wind down and consumers wait for cheaper models.',
-    source: 'AutoMonitor',
-    timestamp: '1 day ago',
-    category: 'Industry',
-    relatedStocks: ['TSLA', 'BMWYY', 'VWAGY'],
+    relatedStocks: ['NVDA', 'TSMC', 'BABA'],
     sentiment: 'negative',
-    impactScore: 85
+    impactScore: 88,
+    reliability: 92,
+    isFact: true,
+    hasConflict: true,
+    assetImpact: { equity: 'Bearish Semi', bond: 'Neutral', fx: 'USD Volatility' }
   },
   {
-    id: '4',
-    title: 'China Semiconductor Fund Raising $27B',
-    summary: 'Phase 3 of the National Integrated Circuit Industry Investment Fund targets the localization of the chip supply chain amid global trade tensions.',
-    source: 'SinoTech',
-    timestamp: '1 day ago',
+    id: 'm2',
+    title: 'PBOC Signals Potential Liquidity Injection via RRR Cut',
+    summary: 'High-level officials suggest more aggressive monetary easing may be required to stabilize domestic industrial output and housing sentiment.',
+    source: 'MacroBrief',
+    timestamp: '3 hours ago',
     category: 'Macro',
-    relatedStocks: ['BABA', 'TCEHY'],
+    relatedStocks: ['BABA', 'PDD', 'FXI'],
     sentiment: 'positive',
-    impactScore: 65
+    impactScore: 72,
+    reliability: 99,
+    isFact: true,
+    hasConflict: false,
+  },
+  {
+    id: 'i1',
+    title: 'Global Semiconductor Foundries Report 15% Utilization Jump',
+    summary: 'Strong demand from automotive and AI data center sectors is driving a rapid recovery in foundry utilization rates, suggesting a shift in the inventory cycle.',
+    source: 'SemiDaily',
+    timestamp: '2 hours ago',
+    category: 'Industry',
+    relatedStocks: ['TSMC', 'NVDA', 'INTC'],
+    sentiment: 'positive',
+    impactScore: 85,
+    reliability: 95,
+    isFact: true,
+    hasConflict: false,
+  },
+  {
+    id: 'i2',
+    title: 'EV Charging Standards Convergence Accelerated by New EU Mandate',
+    summary: 'New regulations forcing uniform connector standards across the European Union could reduce infrastructure fragmentation but pressure proprietary network operators.',
+    source: 'PowerLink',
+    timestamp: '5 hours ago',
+    category: 'Industry',
+    relatedStocks: ['TSLA', 'VWAGY'],
+    sentiment: 'neutral',
+    impactScore: 65,
+    reliability: 88,
+    isFact: true,
+    hasConflict: true,
   }
-];
-
-const DEFAULT_TIMELINE: TimelineEvent[] = [
-  { date: '2022 NOV', title: 'ChatGPT Release', description: 'OpenAI launches ChatGPT, triggering a global generative AI arms race.', significance: 'Shifted corporate focus toward large language models.' },
-  { date: '2023 MAR', title: 'H100 Shortage', description: 'Massive wait times for NVIDIA GPUs become the bottleneck for tech companies.', significance: 'Proven pricing power for semiconductor manufacturers.' },
-  { date: '2024 FEB', title: 'Blackwell Reveal', description: 'The next generation of AI compute is announced, significantly lowering cost-to-train.', significance: 'Defines the efficiency roadmap for the next 24 months.' },
 ];
 
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<ViewType>('Dashboard');
-  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+  const [selectedStock, setSelectedStock] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSocialLoading, setIsSocialLoading] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [timelineTopic, setTimelineTopic] = useState<string | null>(null);
   const [correlationTopic, setCorrelationTopic] = useState<string | null>(null);
-  
-  const [correlations, setCorrelations] = useState<{nodes: CorrelationNode[], links: CorrelationLink[]}>({
-    nodes: [
-      { id: '1', label: 'AI Compute Demand', group: 'market-trend' },
-      { id: '2', label: 'AMD MI300X', group: 'competitor' },
-      { id: '3', label: 'TSMC CoWoS Capacity', group: 'supplier' },
-      { id: '4', label: 'Intel Gaudi 3', group: 'competitor' },
-    ],
-    links: [
-      { source: 'AI Compute Demand', target: 'AMD MI300X', strength: 0.85, reason: 'High demand overflow leads customers to AMD as an alternative.' },
-      { source: 'TSMC CoWoS Capacity', target: 'AI Compute Demand', strength: 0.9, reason: 'Packaging bottlenecks are the primary constraint for news-driven growth.' },
-    ]
-  });
+  const [correlations, setCorrelations] = useState<{nodes: CorrelationNode[], links: CorrelationLink[]}>({ nodes: [], links: [] });
+  const [concepts, setConcepts] = useState<ConceptIntelligence[]>([]);
+  const [socialSignal, setSocialSignal] = useState<SocialSignal | null>(null);
 
-  const [timeline, setTimeline] = useState<TimelineEvent[]>(DEFAULT_TIMELINE);
+  const macroNews = useMemo(() => MOCK_NEWS.filter(n => n.category === 'Macro'), []);
+  const industryNews = useMemo(() => MOCK_NEWS.filter(n => n.category === 'Industry'), []);
 
-  const handleAnalyze = async (news: NewsItem) => {
-    setIsAnalyzing(true);
-    setAnalysisResult(null);
+  const filteredNews = useMemo(() => {
+    if (!selectedStock) {
+      return MOCK_NEWS;
+    }
+    return MOCK_NEWS.filter(n => n.relatedStocks.includes(selectedStock));
+  }, [selectedStock]);
+
+  useEffect(() => {
+    if (selectedStock) {
+      loadSocialSignal(selectedStock);
+    } else {
+      setSocialSignal(null);
+    }
+  }, [selectedStock]);
+
+  const loadSocialSignal = async (symbol: string) => {
+    setIsSocialLoading(true);
     try {
-      const result = await geminiService.analyzeNewsImpact(news.title, MOCK_STOCKS.map(s => s.symbol));
-      setAnalysisResult(result || "Analysis failed.");
-    } catch (error) {
-      console.error(error);
-      setAnalysisResult("An error occurred during analysis.");
+      const signal = await geminiService.getSocialIntelligence(symbol);
+      setSocialSignal(signal);
+    } catch (e) {
+      console.error("Failed to load social signal", e);
     } finally {
-      setIsAnalyzing(false);
+      setIsSocialLoading(false);
     }
   };
 
-  const handleViewHistory = async (news: NewsItem) => {
+  const handleAnalyze = async (news: NewsItem) => {
     setIsAnalyzing(true);
     try {
-      const historyData = await geminiService.generateTimeline(`History of ${news.relatedStocks[0] || ''} specifically related to ${news.title}`);
-      setTimeline(historyData);
-      setTimelineTopic(news.title);
-      setActiveView('Timeline');
-    } catch (error) {
-      console.error("Failed to generate history:", error);
+      const result = await geminiService.analyzeNewsImpact(news, INITIAL_STOCKS.map(s => s.symbol));
+      setAnalysisResult(result);
+    } catch (e) {
+      setAnalysisResult("Intelligence terminal timeout.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -121,113 +134,166 @@ const App: React.FC = () => {
 
   const handleViewNetwork = async (news: NewsItem) => {
     setIsAnalyzing(true);
+    setCorrelationTopic(news.title);
     try {
-      const networkData = await geminiService.getCorrelations(news.title + " - " + news.summary);
-      setCorrelations(networkData);
-      setCorrelationTopic(news.title);
+      const network = await geminiService.getFactorCorrelations(news.title);
+      setCorrelations(network);
       setActiveView('Correlations');
-    } catch (error) {
-      console.error("Failed to generate correlation network:", error);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const handleClearTimeline = () => {
-    setTimeline(DEFAULT_TIMELINE);
-    setTimelineTopic(null);
+  const handleViewHistory = async (news: NewsItem) => {
+    setIsAnalyzing(true);
+    setTimelineTopic(news.title);
+    setConcepts([]); // Clear previous
+    setActiveView('Timeline');
+    try {
+      const historyConcepts = await geminiService.getHistoricalAnalogy(news.title);
+      setConcepts(historyConcepts);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleViewUserHistory = async (comment: SocialComment) => {
+    setIsAnalyzing(true);
+    try {
+      const historyData = await geminiService.getSocialUserHistory(comment.author, comment.platform);
+      // Map social history to concept structure for unified Timeline view
+      setConcepts([{
+        concept: "User Trace",
+        description: `${comment.author} History Trace - Trust: ${historyData.trustScore}/100. ${historyData.trustSummary}`,
+        history: historyData.pastPosts,
+        trends: []
+      }]);
+      setTimelineTopic(`${comment.author} Profile Analysis`);
+      setActiveView('Timeline');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleViewOpinionCluster = async (comment: SocialComment) => {
+    setIsAnalyzing(true);
+    setCorrelationTopic(`Opinion Clusters: "${comment.content.substring(0, 30)}..."`);
+    try {
+      const clusterData = await geminiService.getSocialOpinionCorrelations(comment.content);
+      setCorrelations(clusterData);
+      setActiveView('Correlations');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
     <Layout activeView={activeView} setActiveView={setActiveView}>
       {activeView === 'Dashboard' && (
-        <div className="animate-in fade-in duration-500">
-          <PortfolioSummary stocks={MOCK_STOCKS} />
-          <NewsFeed 
-            news={MOCK_NEWS} 
-            onAnalyze={handleAnalyze} 
-            onViewHistory={handleViewHistory}
-            onViewNetwork={handleViewNetwork}
-          />
+        <div className="space-y-10 animate-in fade-in duration-700 pb-20">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 min-h-[440px]">
+             <div className="lg:col-span-2">
+                <MacroIntelligence 
+                  macroNews={macroNews} 
+                  onAnalyze={handleAnalyze} 
+                  onViewHistory={handleViewHistory}
+                  onViewNetwork={handleViewNetwork}
+                />
+             </div>
+             <div className="h-full">
+                <PortfolioSummary 
+                  stocks={INITIAL_STOCKS} 
+                  selectedSymbol={selectedStock}
+                  onSelectStock={setSelectedStock}
+                />
+             </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <div className="lg:col-span-3">
+              <NewsFeed 
+                news={filteredNews} 
+                filterLabel={selectedStock}
+                onAnalyze={handleAnalyze} 
+                onViewHistory={handleViewHistory} 
+                onViewNetwork={handleViewNetwork}
+              />
+            </div>
+            <div className="space-y-6">
+              <div className="bg-[#121212] p-8 rounded-[32px] border border-white/5 shadow-2xl bg-gradient-to-b from-[#121212] to-[#0a0a0a]">
+                <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-6">Market Mood Node</h3>
+                <div className="space-y-6">
+                   <div className="flex justify-between items-center text-xs font-bold uppercase">
+                      <span className="text-gray-400">Policy Support</span>
+                      <span className="text-emerald-500 font-black italic">STABLE</span>
+                   </div>
+                   <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 w-[65%]"></div>
+                   </div>
+                   <p className="text-[10px] text-gray-500 leading-relaxed italic">
+                     Analyzing cross-border regulatory shifts and liquidity cues. Overall risk appetite is cautiously constructive.
+                   </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="min-h-[440px]">
+            <IndustryIntelligence 
+              industryNews={industryNews} 
+              onAnalyze={handleAnalyze} 
+              onViewHistory={handleViewHistory}
+              onViewNetwork={handleViewNetwork}
+            />
+          </div>
+
+          {selectedStock && (
+            <div className="h-[420px] animate-in slide-in-from-bottom duration-700">
+              <SocialSentiment 
+                signal={socialSignal} 
+                isLoading={isSocialLoading} 
+                onViewUserHistory={handleViewUserHistory}
+                onViewOpinionCluster={handleViewOpinionCluster}
+              />
+            </div>
+          )}
         </div>
       )}
 
       {activeView === 'Timeline' && (
-        <div className="animate-in slide-in-from-bottom duration-500">
-          <Timeline 
-            events={timeline} 
-            topic={timelineTopic || undefined} 
-            onClear={handleClearTimeline} 
-          />
-        </div>
+        <Timeline concepts={concepts} topic={timelineTopic || undefined} onClear={() => setActiveView('Dashboard')} />
       )}
-
+      
       {activeView === 'Correlations' && (
-        <div className="animate-in zoom-in duration-500">
-          <CorrelationGraph 
-            nodes={correlations.nodes} 
-            links={correlations.links} 
-            topic={correlationTopic || undefined} 
-          />
-        </div>
+        <CorrelationGraph nodes={correlations.nodes} links={correlations.links} topic={correlationTopic || undefined} />
       )}
 
-      {activeView === 'Intelligence' && (
-        <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
-          <div className="p-8 bg-[#121212] rounded-3xl border border-white/5">
-             <h2 className="text-2xl font-bold mb-6">AI Intelligence Terminal</h2>
-             <div className="space-y-4">
-               <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                 <p className="text-sm text-gray-300">"How will the recent semiconductor export restrictions affect my tech portfolio holdings specifically?"</p>
-                 <div className="mt-4 flex items-center space-x-2">
-                   <span className="w-2 h-2 bg-blue-500 rounded-full animate-ping"></span>
-                   <span className="text-xs font-mono text-blue-400">Processing complex vector embeddings...</span>
-                 </div>
-               </div>
-               <div className="p-6 bg-blue-600/10 rounded-2xl border border-blue-500/20 text-gray-200 leading-relaxed text-sm">
-                 <p className="mb-4">Based on your portfolio composition (40% NVDA, 15% TSLA), the primary risk factor is the decoupling of the supply chain. While NVDA has strong alternative markets, the logistics overhead for TSLA's battery supply could increase by 12%.</p>
-                 <div className="flex space-x-2">
-                   <button className="px-3 py-1 bg-white/5 rounded-lg text-xs hover:bg-white/10">Show Source Documents</button>
-                   <button className="px-3 py-1 bg-white/5 rounded-lg text-xs hover:bg-white/10">Simulate Stress Test</button>
-                 </div>
-               </div>
-             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Analysis Modal */}
       {analysisResult && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#121212] w-full max-w-2xl rounded-3xl border border-white/10 shadow-2xl flex flex-col max-h-[80vh]">
-            <div className="p-6 border-b border-white/5 flex items-center justify-between">
-              <h3 className="text-xl font-bold">Gemini Intelligence Analysis</h3>
-              <button onClick={() => setAnalysisResult(null)} className="p-2 hover:bg-white/5 rounded-full">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-3xl z-[100] flex items-center justify-center p-8">
+           <div className="bg-[#0d0d0d] w-full max-w-4xl rounded-[48px] border border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-10 border-b border-white/5 flex items-center justify-between">
+               <div>
+                 <h3 className="text-2xl font-black uppercase italic tracking-tighter">Intelligence Node Output</h3>
+               </div>
+               <button onClick={() => setAnalysisResult(null)} className="p-3 bg-white/5 rounded-2xl hover:bg-white/10">
+                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+               </button>
             </div>
-            <div className="p-8 overflow-y-auto text-gray-300 leading-loose">
-              <div className="prose prose-invert prose-blue">
-                {analysisResult.split('\n').map((line, i) => (
-                  <p key={i} className="mb-4">{line}</p>
-                ))}
-              </div>
-            </div>
-            <div className="p-6 border-t border-white/5 flex justify-end">
-              <button onClick={() => setAnalysisResult(null)} className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-xl font-bold transition-all">
-                Dismiss
-              </button>
+            <div className="p-12 overflow-y-auto custom-scrollbar text-gray-300 leading-relaxed italic whitespace-pre-wrap">
+              {analysisResult}
             </div>
           </div>
         </div>
       )}
 
-      {/* Loading Overlay */}
       {isAnalyzing && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex flex-col items-center justify-center space-y-4">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-xl font-medium tracking-wide">Synthesizing Market Ripples...</p>
-          <p className="text-gray-500 text-sm">Identifying news correlations via Gemini 3 Flash</p>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[200] flex flex-col items-center justify-center">
+          <div className="w-16 h-16 border-[4px] border-blue-600/20 border-t-blue-500 rounded-full animate-spin"></div>
+          <p className="mt-8 text-blue-500 font-black tracking-[0.4em] uppercase text-[11px] animate-pulse">Neural Node Sync...</p>
         </div>
       )}
     </Layout>
